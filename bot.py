@@ -11,7 +11,15 @@ Perintah:
   /agen     daftar agen/job yang dipantau, per kategori, + aktivitas terakhir
   /draft    antrean keputusan draf Threads (jumlah + item tertua)
   /tugas    tugas terbuka, dikelompokkan per kategori
+  /tanya    catat pertanyaan buat Muse, dijawab berkala (lihat bawah)
   /help     sama dengan /start
+
+Pertanyaan buat Muse:
+  Selain perintah di atas, pesan teks biasa yang mention bot ini atau
+  membalas pesan bot ini (atau diawali /tanya) dicatat ke questions.json.
+  Muse (di mesin lain) membaca antrean itu berkala lewat
+  GET /api/questions, lalu mengirim jawaban lewat POST /api/answer,
+  yang diteruskan bot ini ke chat asal pertanyaan sebagai balasan.
 
 Dua mode update status (lihat README):
   1. Mode lokal: Muse menulis status.json langsung (satu mesin yang sama).
@@ -27,6 +35,7 @@ Env var:
   DASHBOARD_SECRET    secret untuk POST /api/report (kosong = endpoint mati)
   DASHBOARD_HOST      host endpoint HTTP (default 127.0.0.1)
   DASHBOARD_PORT      port endpoint HTTP (default 8080, Railway pakai $PORT)
+  QUESTIONS_FILE      path questions.json (default: sebelah status.json)
 """
 
 import asyncio
@@ -41,7 +50,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from status import CATEGORY_ORDER, DEFAULT_PATH, apply_payload, load_status, save_status
 
@@ -57,6 +66,71 @@ DASHBOARD_HOST = os.environ.get("DASHBOARD_HOST", "127.0.0.1")
 DASHBOARD_PORT = int(
     os.environ.get("DASHBOARD_PORT") or os.environ.get("PORT", "8080")
 )
+
+QUESTIONS_PATH = os.environ.get(
+    "QUESTIONS_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(STATUS_PATH)), "questions.json"),
+)
+_QLOCK = __import__("threading").Lock()
+
+
+def _load_questions():
+    try:
+        with open(QUESTIONS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get("questions"), list):
+            data.setdefault("next_id", len(data["questions"]) + 1)
+            return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return {"next_id": 1, "questions": []}
+
+
+def _save_questions(data):
+    with open(QUESTIONS_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _add_question(chat_id, message_id, user_name, username, text):
+    with _QLOCK:
+        data = _load_questions()
+        q = {
+            "id": data["next_id"],
+            "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "user": user_name,
+            "username": username,
+            "text": text,
+            "answered": False,
+            "answer": None,
+            "answered_at": None,
+        }
+        data["next_id"] += 1
+        data["questions"].append(q)
+        data["questions"] = data["questions"][-100:]
+        _save_questions(data)
+        return q
+
+
+def _pending_questions():
+    with _QLOCK:
+        data = _load_questions()
+        return [q for q in data["questions"] if not q.get("answered")]
+
+
+def _mark_answered(qid, answer_text):
+    with _QLOCK:
+        data = _load_questions()
+        for q in data["questions"]:
+            if q.get("id") == qid:
+                q["answered"] = True
+                q["answer"] = answer_text
+                q["answered_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+                _save_questions(data)
+                return q
+        return None
+
 
 # Urutan kategori diimpor dari status.py supaya sama dengan bot.py.
 JOB_ICON = {"ok": "✅", "failed": "❌", "pending": "⏳", "blocked": "🚫", "idle": "💤"}
@@ -136,6 +210,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/agen, daftar agen dan aktivitas terakhir\n"
         "/draft, antrean keputusan draf Threads\n"
         "/tugas, tugas terbuka\n"
+        "/tanya &lt;pertanyaan&gt;, catat pertanyaan buat Muse (atau mention saya / balas pesan saya). Muse cek berkala dan jawab di sini.\n"
     )
     await update.message.reply_text(_trim(teks), parse_mode="HTML")
 
@@ -239,6 +314,55 @@ async def cmd_tugas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(_trim("\n".join(bagian)), parse_mode="HTML")
 
 
+# ---------------------------------------------------- pertanyaan buat Muse
+
+async def _catat(update, teks):
+    msg = update.message
+    user = msg.from_user
+    q = _add_question(
+        msg.chat_id,
+        msg.message_id,
+        (user.full_name if user else "?"),
+        (user.username if user else ""),
+        teks.strip(),
+    )
+    await msg.reply_text(
+        "📥 Pertanyaan #%d dicatat buat Muse. Muse cek antrean berkala, jawabannya dikirim sebagai balasan pesan ini." % q["id"]
+    )
+
+
+async def cmd_tanya(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    teks = " ".join(context.args or []).strip()
+    if not teks:
+        await update.message.reply_text(
+            "Tulis pertanyaannya sekalian, misal: /tanya job Booklogd terakhir gimana?"
+        )
+        return
+    await _catat(update, teks)
+
+
+async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text or not msg.from_user or msg.from_user.is_bot:
+        return
+    if CHAT_ID and str(msg.chat_id) != str(CHAT_ID) and msg.chat.type != "private":
+        return
+    teks = msg.text.strip()
+    bot_name = (context.bot.username or "").lower()
+    disebut = ("@" + bot_name) in teks.lower() if bot_name else False
+    balasan_ke_bot = bool(
+        msg.reply_to_message
+        and msg.reply_to_message.from_user
+        and msg.reply_to_message.from_user.id == context.bot.id
+    )
+    if msg.chat.type != "private" and not (disebut or balasan_ke_bot):
+        return
+    if disebut and bot_name:
+        teks = teks.replace("@" + bot_name, "").replace("@" + bot_name.capitalize(), "").strip(" ,:")
+    if teks:
+        await _catat(update, teks)
+
+
 # ------------------------------------------------------- endpoint HTTP (push)
 
 def _forward_text(text):
@@ -248,6 +372,23 @@ def _forward_text(text):
         return False
     coro = _APP.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode="HTML")
     fut = asyncio.run_coroutine_threadsafe(coro, _LOOP)
+    fut.result(timeout=20)
+    return True
+
+
+def _forward_answer(text, chat_id, reply_to=None):
+    """Kirim jawaban Muse ke chat asal pertanyaan, sebagai balasan kalau bisa."""
+    if _APP is None or _LOOP is None or not chat_id:
+        return False
+    async def _kirim():
+        try:
+            await _APP.bot.send_message(
+                chat_id=chat_id, text=text, parse_mode="HTML",
+                reply_to_message_id=reply_to,
+            )
+        except Exception:
+            await _APP.bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+    fut = asyncio.run_coroutine_threadsafe(_kirim(), _LOOP)
     fut.result(timeout=20)
     return True
 
@@ -292,10 +433,50 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in ("/", "/health"):
             self._jawab(200, {"ok": True, "push": bool(DASHBOARD_SECRET)})
+        elif self.path == "/api/questions":
+            if not DASHBOARD_SECRET:
+                self._jawab(503, {"ok": False, "error": "DASHBOARD_SECRET kosong"})
+            elif not self._boleh():
+                self._jawab(401, {"ok": False, "error": "secret salah"})
+            else:
+                self._jawab(200, {"ok": True, "pending": _pending_questions()})
         else:
             self._jawab(404, {"ok": False, "error": "tidak dikenal"})
 
     def do_POST(self):
+        if self.path == "/api/answer":
+            if not DASHBOARD_SECRET:
+                self._jawab(503, {"ok": False, "error": "DASHBOARD_SECRET kosong"})
+                return
+            if not self._boleh():
+                self._jawab(401, {"ok": False, "error": "secret salah"})
+                return
+            try:
+                panjang = int(self.headers.get("Content-Length") or 0)
+                payload = json.loads(self.rfile.read(panjang).decode("utf-8") or "{}")
+            except (ValueError, UnicodeDecodeError):
+                self._jawab(400, {"ok": False, "error": "body bukan JSON"})
+                return
+            qid = payload.get("id", payload.get("question_id"))
+            teks = str(payload.get("text") or "").strip()
+            if qid is None or not teks:
+                self._jawab(400, {"ok": False, "error": "wajib ada id dan text"})
+                return
+            with _QLOCK:
+                data = _load_questions()
+                q = next((x for x in data["questions"] if x.get("id") == qid), None)
+            if q is None:
+                self._jawab(404, {"ok": False, "error": "pertanyaan tidak ditemukan"})
+                return
+            try:
+                terkirim = _forward_answer(teks, q.get("chat_id"), q.get("message_id"))
+            except Exception as exc:  # noqa: BLE001
+                self._jawab(502, {"ok": False, "error": "gagal kirim: %s" % exc})
+                return
+            if terkirim:
+                _mark_answered(qid, teks)
+            self._jawab(200, {"ok": True, "answered": qid, "forwarded": terkirim})
+            return
         if self.path != "/api/report":
             self._jawab(404, {"ok": False, "error": "tidak dikenal"})
             return
@@ -367,6 +548,8 @@ async def _run(token):
     app.add_handler(CommandHandler("agen", cmd_agen))
     app.add_handler(CommandHandler("draft", cmd_draft))
     app.add_handler(CommandHandler("tugas", cmd_tugas))
+    app.add_handler(CommandHandler("tanya", cmd_tanya))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
     await app.initialize()
     await app.start()
