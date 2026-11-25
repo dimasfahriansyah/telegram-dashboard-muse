@@ -1,0 +1,17 @@
+[Unit]
+Description=Dashboard Telegram Muse (bot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ganti /opt/muse-dashboard dengan folder instalasi, dan ubuntu dengan user VPS.
+WorkingDirectory=/opt/muse-dashboard
+User=ubuntu
+EnvironmentFile=/opt/muse-dashboard/.env
+ExecStart=/usr/bin/python3 /opt/muse-dashboard/bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

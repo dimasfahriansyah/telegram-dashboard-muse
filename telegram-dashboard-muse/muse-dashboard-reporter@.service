@@ -1,0 +1,11 @@
+[Unit]
+Description=Kirim laporan Dashboard Muse (%i)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/muse-dashboard
+User=ubuntu
+EnvironmentFile=/opt/muse-dashboard/.env
+# %i diisi dari nama timer: pagi atau sore.
+ExecStart=/usr/bin/python3 /opt/muse-dashboard/reporter.py %i

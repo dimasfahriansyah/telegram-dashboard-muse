@@ -1,0 +1,10 @@
+[Unit]
+Description=Kirim rencana pagi Dashboard Muse tiap hari jam 08:00 WIB
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+Unit=muse-dashboard-reporter@pagi.service
+
+[Install]
+WantedBy=timers.target

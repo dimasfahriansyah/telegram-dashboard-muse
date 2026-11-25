@@ -1,0 +1,151 @@
+{
+  "drafts": {
+    "oldest": [
+      {
+        "author": "@hasbi_shdqi",
+        "id": 52,
+        "note": "sudah basi, sarankan hapus",
+        "topic": "Muse AI, kode referral"
+      },
+      {
+        "author": "@aitips.id",
+        "id": 53,
+        "note": "ditahan, akun posting peringatan kode",
+        "topic": "Muse AI, video intro"
+      },
+      {
+        "author": "@ismanto.id",
+        "id": 54,
+        "note": "mungkin basi",
+        "topic": "Muse AI, reset token 9 Nov"
+      }
+    ],
+    "total_pending": 96
+  },
+  "jobs": [
+    {
+      "category": "Pantauan Threads",
+      "id": "threads-pagi",
+      "last_run": "2026-11-24T09:36:00+07:00",
+      "name": "Pantauan Muse AI Pagi",
+      "schedule": "09:36 WIB",
+      "status": "ok",
+      "summary": "3 draf baru, 0 dibalas"
+    },
+    {
+      "category": "Pantauan Threads",
+      "id": "threads-siang",
+      "last_run": "2026-11-24T13:36:00+07:00",
+      "name": "Pantauan Muse AI Siang",
+      "schedule": "13:36 WIB",
+      "status": "ok",
+      "summary": "2 draf baru"
+    },
+    {
+      "category": "Pantauan Threads",
+      "id": "threads-malam",
+      "last_run": null,
+      "name": "Pantauan Muse AI Malam",
+      "schedule": "19:36 WIB",
+      "status": "pending",
+      "summary": "belum jalan hari ini"
+    },
+    {
+      "category": "Ngirit",
+      "id": "ngirit-malam",
+      "last_run": null,
+      "name": "Cek Ngirit Malam",
+      "schedule": "21:36 WIB",
+      "status": "pending",
+      "summary": "menunggu laporan makan hari ini"
+    },
+    {
+      "category": "Ngirit",
+      "id": "nabung-bulanan",
+      "last_run": null,
+      "name": "Pengingat Nabung + Gajian",
+      "schedule": "25 tiap bulan 09:36",
+      "status": "idle",
+      "summary": "gajian besok 25 Nov, transfer Rp1 jt ke tabungan"
+    },
+    {
+      "category": "Booklogd",
+      "id": "booklogd-retest",
+      "last_run": "2026-11-24T06:56:00+07:00",
+      "name": "Retest Booklogd v15.72",
+      "schedule": "kalau diminta",
+      "status": "ok",
+      "summary": "retest terdaftar selesai, 7 diperbaiki, 5 masih rusak"
+    },
+    {
+      "category": "Bot Telegram",
+      "id": "telegram-mcp",
+      "last_run": null,
+      "name": "Setup Bot Telegram + MCP Muse",
+      "schedule": "kalau diminta",
+      "status": "blocked",
+      "summary": "butuh token bot + host, belum diputuskan"
+    },
+    {
+      "category": "VPS",
+      "id": "vps-hunt",
+      "last_run": "2026-11-24T08:05:00+07:00",
+      "name": "Perburuan VPS Gratis",
+      "schedule": "tenggat 30 Nov",
+      "status": "blocked",
+      "summary": "menunggu pilihan A/B/C/D"
+    },
+    {
+      "category": "Produksi Kreatif",
+      "id": "produksi-video",
+      "last_run": null,
+      "name": "Produksi Video + Desain",
+      "schedule": "kalau diminta",
+      "status": "idle",
+      "summary": "tidak ada render jalan"
+    }
+  ],
+  "tasks": [
+    {
+      "category": "VPS",
+      "due": "2026-11-30",
+      "id": "vps-pilih",
+      "note": "RackNerd tutup 30 Nov",
+      "status": "open",
+      "title": "Pilih VPS gratis (A/B/C/D)"
+    },
+    {
+      "category": "Bot Telegram",
+      "due": null,
+      "id": "telegram-token",
+      "note": "token masuk .env, jangan dishare",
+      "status": "open",
+      "title": "Buat bot di @BotFather dan simpan token"
+    },
+    {
+      "category": "Bot Telegram",
+      "due": null,
+      "id": "telegram-host",
+      "note": "Ubuntu 22.04/24.04, 2 OCPU/12GB, jalankan systemd",
+      "status": "open",
+      "title": "Buat VM Oracle Always Free buat bot"
+    },
+    {
+      "category": "Booklogd",
+      "due": null,
+      "id": "booklogd-followup",
+      "note": "cek update berikutnya dari developer",
+      "status": "open",
+      "title": "Cek perbaikan Booklogd (layar hitam, seret)"
+    },
+    {
+      "category": "Bot Telegram",
+      "due": null,
+      "id": "mcp-pilih",
+      "note": "AnythingMCP trial 7 hari, tgbot-mcp butuh VPS",
+      "status": "open",
+      "title": "Pilih jalur MCP: AnythingMCP atau tgbot-mcp"
+    }
+  ],
+  "updated_at": "2026-11-24T19:30:00+07:00"
+}

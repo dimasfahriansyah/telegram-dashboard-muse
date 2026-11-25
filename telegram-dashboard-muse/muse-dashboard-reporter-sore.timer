@@ -1,0 +1,10 @@
+[Unit]
+Description=Kirim laporan sore Dashboard Muse tiap hari jam 17:30 WIB
+
+[Timer]
+OnCalendar=*-*-* 17:30:00
+Persistent=true
+Unit=muse-dashboard-reporter@sore.service
+
+[Install]
+WantedBy=timers.target
